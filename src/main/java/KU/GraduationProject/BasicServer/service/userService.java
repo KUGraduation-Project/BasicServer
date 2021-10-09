@@ -1,102 +1,113 @@
 package KU.GraduationProject.BasicServer.service;
 
-import KU.GraduationProject.BasicServer.domain.entity.account.user;
-import KU.GraduationProject.BasicServer.domain.repository.userRepositoryImpl;
-import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.stereotype.Service;
-
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Collections;
 import java.util.Optional;
 
+import KU.GraduationProject.BasicServer.dto.loginDto;
+import KU.GraduationProject.BasicServer.dto.response.defaultResult;
+import KU.GraduationProject.BasicServer.dto.response.responseMessage;
+import KU.GraduationProject.BasicServer.dto.response.statusCode;
+import KU.GraduationProject.BasicServer.domain.entity.account.authority;
+import KU.GraduationProject.BasicServer.domain.entity.account.user;
+import KU.GraduationProject.BasicServer.domain.repository.userRepository;
+import KU.GraduationProject.BasicServer.dto.tokenDto;
+import KU.GraduationProject.BasicServer.dto.userDto;
+import KU.GraduationProject.BasicServer.jwt.jwtFilter;
+import KU.GraduationProject.BasicServer.jwt.tokenProvider;
+import KU.GraduationProject.BasicServer.util.securityUtil;
+import javassist.bytecode.DuplicateMemberException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+
 @Service
-@RequiredArgsConstructor
-public class userService implements UserDetailsService {
+public class userService {
 
     private static final Logger log = LoggerFactory.getLogger(userService.class);
-    private final userRepositoryImpl userRepository;
 
-    @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return userRepository.findByEmail(username)
-                .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+    @Autowired
+    private tokenProvider tokenProvider;
+    private final userRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private AuthenticationManagerBuilder authenticationManagerBuilder;
+
+    public userService(userRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
-    public Optional<user> findById(Long id){
-        Optional<user> user = Optional.empty();
+    @Transactional
+    public ResponseEntity<Object> signup(userDto userDto) throws DuplicateMemberException {
+        if (userRepository.findOneWithAuthoritiesByEmail(userDto.getEmail()).orElse(null) != null) {
+            log.error("이미 가입되어 있는 유저입니다.");
+            return new ResponseEntity(defaultResult.res(statusCode.OK, responseMessage.DUPLICATED_USER,userDto), HttpStatus.OK);
+
+        }
+
+        authority authority = KU.GraduationProject.BasicServer.domain.entity.account.authority.builder()
+                .authorityName("ROLE_USER")
+                .build();
+
+        user user = KU.GraduationProject.BasicServer.domain.entity.account.user.builder()
+                .email(userDto.getEmail())
+                .password(passwordEncoder.encode(userDto.getPassword()))
+                .nickname(userDto.getNickname())
+                .birth(userDto.getBirth())
+                .authorities(Collections.singleton(authority))
+                .activated(true)
+                .build();
+
+        return new ResponseEntity(defaultResult.res(statusCode.OK, responseMessage.CREATED_USER,userRepository.save(user)), HttpStatus.OK);
+
+    }
+
+    public ResponseEntity<Object> accessTokenProvider(loginDto loginDto){
+
+        UsernamePasswordAuthenticationToken authenticationToken =
+                new UsernamePasswordAuthenticationToken(loginDto.getEmail(), loginDto.getPassword());
+
+        Authentication authentication = authenticationManagerBuilder.getObject().authenticate(authenticationToken);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        String jwt = tokenProvider.createToken(authentication);
+
+        HttpHeaders httpHeaders = new HttpHeaders();
+        httpHeaders.add(jwtFilter.AUTHORIZATION_HEADER, "Bearer " + jwt);
+
+        return new ResponseEntity(defaultResult.res(statusCode.OK, responseMessage.ACCESS_TOKEN_SUCCESS,new tokenDto(jwt)), HttpStatus.OK);
+
+    }
+
+    @Transactional(readOnly = true)
+    public ResponseEntity<Object> getUserWithAuthorities(String username) {
         try{
-            user = userRepository.findById(id);
+            return new ResponseEntity(defaultResult.res(statusCode.OK, responseMessage.READ_USER,userRepository.findOneWithAuthoritiesByEmail(username).get()), HttpStatus.OK);
         }
         catch(Exception ex){
-            log.error(ex.getMessage());
+            return new ResponseEntity(defaultResult.res(statusCode.BAD_REQUEST, responseMessage.INVALID_TOKEN,username), HttpStatus.OK);
         }
-        return user;
     }
 
-    public Optional<user> findByEmail(String userName){
-        Optional<user> user = Optional.empty();
+    @Transactional(readOnly = true)
+    public ResponseEntity<Object> getMyUserWithAuthorities() {
         try{
-            user = userRepository.findByEmail(userName);
+            return new ResponseEntity(defaultResult.res(statusCode.OK, responseMessage.READ_USER,securityUtil.getCurrentUsername().flatMap(userRepository::findOneWithAuthoritiesByEmail)), HttpStatus.OK);
         }
         catch(Exception ex){
-            log.error(ex.getMessage());
-        }
-        return user;
-    }
-
-    public void editById(Long userId, user update){
-        checkIsUserExist(userId);
-        try{
-            Optional<user> user = userRepository.findById(userId);
-            user.get().setPassword(update.getPassword());
-            user.get().setEmail(update.getEmail());
-            user.get().setBirth(update.getBirth());
-            if(update.getImage()!=null){
-                user.get().setImage(update.getImage());
-            }
-            userRepository.save(user.get());
-        }
-        catch(Exception ex){
-            log.error(ex.getMessage());
+            return new ResponseEntity(defaultResult.res(statusCode.BAD_REQUEST, responseMessage.INVALID_TOKEN,securityUtil.getCurrentUsername().flatMap(userRepository::findOneWithAuthoritiesByEmail)), HttpStatus.OK);
         }
     }
-
-    private void checkIsUserExist(Long userId){
-        if (!userRepository.existsById(userId)) {
-            throw new IllegalStateException("존재하지 않는 사용자 입니다");
-        }
-    }
-
-    public void deleteById(Long userId){
-        checkIsUserExist(userId);
-        try{
-            userRepository.deleteById(userId);
-        }
-        catch(Exception ex){
-            log.error(ex.getMessage());
-        }
-    }
-
-    public List<user> findAll(){
-        List<user> users = new ArrayList<user>();
-        try{
-            users = userRepository.findAll();
-        }
-        catch(Exception ex){
-            log.error(ex.getMessage());
-        }
-        return users;
-    }
-
-    public void deleteAll(){
-        if(userRepository.findAll() != null){
-            userRepository.deleteAll();
-        }
-    }
-
 }

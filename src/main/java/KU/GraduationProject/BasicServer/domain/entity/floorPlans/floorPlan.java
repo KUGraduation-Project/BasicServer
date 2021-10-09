@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 import javax.persistence.*;
 
 @Data
-@Entity(name="floorPlan")
+@Entity
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
@@ -18,11 +18,14 @@ public class floorPlan{
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long floorPlanId;
+
     @Column(nullable = false)
     private boolean isValid;
+
     @Lob
     @Column(columnDefinition = "LONGBLOB",nullable=true)
     private byte[] image;
+
     @ManyToOne(targetEntity = area.class)
     @JoinColumn(name = "areaId")
     private area area;
@@ -31,7 +34,6 @@ public class floorPlan{
         this.isValid = true;
         this.image = image;
         this.area = area;
-
     }
 
 }
