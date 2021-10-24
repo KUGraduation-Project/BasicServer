@@ -3,7 +3,7 @@ package KU.GraduationProject.BasicServer.controller;
 import KU.GraduationProject.BasicServer.dto.response.defaultResult;
 import KU.GraduationProject.BasicServer.dto.response.responseMessage;
 import KU.GraduationProject.BasicServer.dto.response.statusCode;
-import KU.GraduationProject.BasicServer.service.imageFileHandlingService;
+import KU.GraduationProject.BasicServer.service.project.imageFileHandlingService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +37,11 @@ public class imageFileController {
     @PostMapping("/post/uploadFile")
     public ResponseEntity<Object> uploadFile(@RequestParam("file") MultipartFile file){
         return imageFileHandlingService.storeFile(file);
+    }
+
+    @GetMapping("/image/list")
+    public ResponseEntity<Object> getImageFileList(){
+        return imageFileHandlingService.getImageFileList();
     }
 
     @PostMapping("/post/uploadMultipleFiles")

@@ -1,8 +1,10 @@
 package KU.GraduationProject.BasicServer.controller;
 
-import KU.GraduationProject.BasicServer.dto.loginDto;
-import KU.GraduationProject.BasicServer.dto.userDto;
-import KU.GraduationProject.BasicServer.service.userService;
+import KU.GraduationProject.BasicServer.dto.accountDto.checkPasswordDto;
+import KU.GraduationProject.BasicServer.dto.accountDto.loginDto;
+import KU.GraduationProject.BasicServer.dto.accountDto.updateUserInfoDto;
+import KU.GraduationProject.BasicServer.dto.accountDto.userDto;
+import KU.GraduationProject.BasicServer.service.account.userService;
 import javassist.bytecode.DuplicateMemberException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -40,9 +42,24 @@ public class userController {
         return userService.signup(userDto);
     }
 
+    @DeleteMapping("/withdrawal")
+    public ResponseEntity<Object> withdrawal(@Valid @RequestBody checkPasswordDto checkPasswordDto){
+        return userService.withdrawal(checkPasswordDto);
+    }
+
     @PostMapping("/authenticate")
     public ResponseEntity<Object> authorize(@Valid @RequestBody loginDto loginDto) {
        return userService.accessTokenProvider(loginDto);
+    }
+
+    @PostMapping("/check/password")
+    public ResponseEntity<Object> checkPassword(@Valid @RequestBody checkPasswordDto checkPasswordDto) {
+        return userService.checkPassword(checkPasswordDto);
+    }
+
+    @PutMapping("/update/userInfo")
+    public ResponseEntity<Object> update(@Valid @RequestBody updateUserInfoDto updateUserInfoDto){
+        return userService.updateUserInfo(updateUserInfoDto);
     }
 
     @GetMapping("/user")

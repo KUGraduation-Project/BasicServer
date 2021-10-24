@@ -1,35 +1,42 @@
 package KU.GraduationProject.BasicServer.controller;
 
-import KU.GraduationProject.BasicServer.dto.imageProcessingData.contourDto;
-import KU.GraduationProject.BasicServer.dto.projectDto;
-import KU.GraduationProject.BasicServer.service.getImageProcessingDataService;
-import KU.GraduationProject.BasicServer.service.projectService;
-import KU.GraduationProject.BasicServer.service.saveImageProcessingDataService;
-import org.springframework.beans.factory.annotation.Autowired;
+import KU.GraduationProject.BasicServer.dto.projectDto.newProjectDto;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
+import org.springframework.web.multipart.MultipartException;
 
 @RestController
 @RequestMapping("/project")
+@RequiredArgsConstructor
 public class projectController {
 
-    @Autowired
-    private getImageProcessingDataService getImageProcessingDataService;
+    private final KU.GraduationProject.BasicServer.service.dataProcessing.getImageProcessingDataService getImageProcessingDataService;
 
-    @Autowired
-    private saveImageProcessingDataService saveImageProcessingDataService;
+    private final KU.GraduationProject.BasicServer.service.dataProcessing.getAIProcessingDataService getAIProcessingDataService;
 
-    @Autowired
-    private projectService projectService;
+    private final KU.GraduationProject.BasicServer.service.project.projectService projectService;
 
+    private final KU.GraduationProject.BasicServer.service.docker.makeContainerService makeContainerService;
+
+    @ExceptionHandler(MultipartException.class)
     @PostMapping("/new")
-    public ResponseEntity<Object> createNewProject(@RequestBody projectDto projectDto){
-        getImageProcessingDataService.getCoordinate(projectDto.getImageFileId());
-        return projectService.createProject(projectDto);
+    public ResponseEntity<Object> createNewProject(@RequestBody newProjectDto newProjectDto) throws JsonProcessingException {
+        //makeContainerService.runImageProcessingServerShellScript();
+        getImageProcessingDataService.getCoordinate(newProjectDto.getImageFileId());
+        //getAIProcessingDataService.getWallPlotLength(newProjectDto.getImageFileId());
+        return projectService.createProject(newProjectDto);
+    }
+
+    @GetMapping("/findAll")
+    public ResponseEntity<Object> showProjectList(){
+        return projectService.showProjectList();
     }
 
 
-
+    @DeleteMapping("/{id}/delete")
+    public ResponseEntity<Object> deleteProject(@PathVariable Long id){
+        return projectService.deleteProject(id);
+    }
 }
